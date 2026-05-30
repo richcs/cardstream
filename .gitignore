@@ -1,0 +1,29 @@
+# Build output
+build/
+out/
+bin/
+.gradle/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Node / frontend
+node_modules/
+dist/
+frontend/.vite/
+
+# Env / secrets
+.env
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

@@ -1,0 +1,99 @@
+name: cardstream
+
+services:
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: cardstream-kafka
+    ports:
+      - "29092:29092"   # host access (advertised as localhost:29092)
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  topic-init:
+    image: apache/kafka:3.8.0
+    container_name: cardstream-topic-init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        set -e
+        BS=kafka:9092
+        T=/opt/kafka/bin/kafka-topics.sh
+        create() { $$T --bootstrap-server $$BS --create --if-not-exists --topic "$$1" --partitions 6 --replication-factor 1 $${2:-}; }
+        create listings
+        create sales
+        create price-updates
+        create agg-price-windowed
+        create arbitrage
+        create alerts
+        create card-metadata "--config cleanup.policy=compact"
+        echo "=== topics ==="
+        $$T --bootstrap-server $$BS --list
+    restart: "no"
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: cardstream-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: cardstream
+      POSTGRES_USER: cardstream
+      POSTGRES_PASSWORD: cardstream
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cardstream -d cardstream"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # --- Application services (build on demand; not required for Phase 0 infra verification) ---
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: cardstream-backend
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    profiles: ["apps"]
+
+  simulator:
+    build:
+      context: .
+      dockerfile: simulator/Dockerfile
+    container_name: cardstream-simulator
+    environment:
+      SERVER_PORT: 8081
+    ports:
+      - "8081:8081"
+    profiles: ["apps"]
+
+volumes:
+  pgdata:

@@ -1,0 +1,21 @@
+spring:
+  application:
+    name: cardstream-backend
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  health:
+    # Don't fail the whole health check when Kafka isn't reachable during local standalone runs.
+    kafka:
+      enabled: false

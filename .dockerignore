@@ -1,0 +1,11 @@
+**/build/
+**/.gradle/
+.gradle/
+**/out/
+**/bin/
+node_modules/
+frontend/
+.git/
+*.md
+.idea/
+.vscode/
