@@ -71,11 +71,12 @@ cardstream/
 - **Done when:** recent catalog seeded (sets since cutoff, low thousands of cards), search/filter works, `card-metadata` topic populated.
 
 ### Phase 2 — Simulator (TCGplayer-shaped feed)
-- Standalone service seeded from the catalog (shares `common` + reads Pokémon TCG API or a snapshot).
-- Price engine: geometric random walk per `(cardId, finish, condition)`; generates listings & sales at configurable rate (~100–500 eps).
-- TCGplayer-shaped REST: `GET /pricing/{productId}`, `GET /listings?since=`, `GET /sales?since=` (and a catalog endpoint).
-- Admin endpoints to **inject** a price spike or an arbitrage listing on demand (for deterministic demos).
-- **Done when:** simulator emits a steady, pollable stream; injection endpoints produce observable anomalies.
+- Standalone service, **seeded from the backend's `GET /api/cards`** at startup (retries while the backend warms up; reseed via `POST /admin/catalog/reload`). Shares `common` for the enums.
+- **Product/SKU model:** each catalog card becomes a product with a **synthetic numeric `productId`** and a `productId ↔ cardId` map (exposed via `/catalog`); a **SKU** = product × finish × condition (TCGplayer's grain). Finishes are inferred from rarity (commons/uncommons → NORMAL + REVERSE_HOLOFOIL; rarer → + HOLOFOIL).
+- Price engine: geometric (log-normal) random walk per **SKU**, seeded deterministically from rarity × finish × condition; money kept as `BigDecimal`. Generates listings & sales at a configurable rate (`simulator.feed.events-per-second`, default 200) into in-memory, retention-bounded buffers.
+- TCGplayer-shaped REST: `GET /catalog/products[/{productId}]`, `GET /pricing/{productId}` (low/mid/high/market/directLow per SKU), `GET /listings?since=&limit=`, `GET /sales?since=&limit=` (ISO-8601 `since`). See Appendix E.
+- Admin endpoints to **inject** a price spike (multiplicative jump + sale burst) or an arbitrage listing (single below-market listing) on demand: `POST /admin/inject/spike`, `POST /admin/inject/arbitrage`.
+- **Done when:** simulator emits a steady, pollable stream; injection endpoints produce observable anomalies. ✅ Verified: seeded 122 products / 1510 SKUs from the backend, steady ~200+ eps with working `since=` polling, spike jumped a SKU 3× with a sale burst, arbitrage produced a 0.6× below-market listing in the feed.
 
 ### Phase 3 — Ingestion
 - `ingestion` module: scheduled poller hits the simulator's REST endpoints, diffs/normalizes, and produces `listing` / `sale` / `price-update` events to Kafka keyed by `(cardId, finish, condition)`.
@@ -187,3 +188,32 @@ All thresholds live in `application.yml` (`market.thresholds.*`). Catalog scope 
 - `watchlist(user_id, card_id, created_at, PK(user_id, card_id))`
 
 Migrations via Flyway on the backend classpath at `backend/src/main/resources/db/migration/` (default `classpath:db/migration`) — so they ship in the jar and run identically in the IDE, Docker, and tests. `V1__catalog.sql` creates `card_set` + `card`.
+
+---
+
+## Appendix E — Simulator (TCGplayer-shaped) contract
+
+Standalone service on **port 8081**. Stands in for TCGplayer; the Phase 3 poller resolves `productId → cardId` via `/catalog`, maps `subTypeName → Finish`, and republishes to Kafka. Config under `simulator.*` (backend base-url, `feed.events-per-second`, `feed.sale-ratio`, `feed.retention`, `feed.default-limit`, `walk.sigma`/`drift`, `conditions`).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/catalog/products?page=&pageSize=` | Products (synthetic `productId`, `cardId`, name, set, rarity, SKUs); `{items,page,pageSize,total}` |
+| GET | `/catalog/products/{productId}` | One product; 404 if unknown |
+| GET | `/pricing/{productId}` | Per-SKU `lowPrice/midPrice/highPrice/marketPrice/directLowPrice`; 404 if unknown |
+| GET | `/listings?since=&limit=` | Listing events newer than `since` (ISO-8601 instant; 400 if unparseable), capped at `limit` |
+| GET | `/sales?since=&limit=` | Sale events, same semantics |
+| POST | `/admin/inject/spike` | `{cardId, finish?, condition?, factor?=2.5, burst?=6}` → price jump + sale burst |
+| POST | `/admin/inject/arbitrage` | `{cardId, finish?, condition?, factor?=0.7}` → one below-market listing |
+| POST | `/admin/catalog/reload` | Reseed products from the backend catalog |
+
+A **SKU** = product × finish × condition; `subTypeName` is the printing label (`Normal`/`Holofoil`/`Reverse Holofoil`). Feed event shapes (the poller maps these to the canonical `listings`/`sales` events in Appendix A):
+
+```jsonc
+// GET /listings item
+{ "eventId": 16746, "productId": 500000, "skuId": 1000005, "subTypeName": "Reverse Holofoil",
+  "condition": "NM", "price": 0.17, "quantity": 1, "sellerId": "s-0453", "listedAt": "2026-05-31T13:49:27Z" }
+
+// GET /sales item
+{ "eventId": 16802, "productId": 500000, "skuId": 1000000, "subTypeName": "Normal",
+  "condition": "NM", "price": 0.84, "quantity": 1, "soldAt": "2026-05-31T13:49:05Z" }
+```

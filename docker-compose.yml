@@ -94,8 +94,13 @@ services:
       context: .
       dockerfile: simulator/Dockerfile
     container_name: cardstream-simulator
+    depends_on:
+      backend:
+        condition: service_started
     environment:
       SERVER_PORT: 8081
+      # Seeds its product universe from the backend catalog (retries while backend warms up).
+      SIMULATOR_BACKEND_BASE_URL: http://backend:8080
     ports:
       - "8081:8081"
     profiles: ["apps"]

@@ -73,7 +73,9 @@ curl http://localhost:8081/actuator/health   # simulator
 
 ## Status
 
-Phase 1 (metadata & catalog) complete and verified: recency-scoped Pokémon TCG API loader → Postgres (`card_set` + `card`, Flyway `V1__catalog.sql`) + compacted `card-metadata` topic; `GET /api/cards` (search/filter/paged) and `GET /api/cards/{cardId}`; on-demand `POST /api/admin/catalog/reload` (the loader is off at startup by default — `market.catalog.load-on-startup`). Verified end-to-end against live infra: a set's 122 cards landed in Postgres and the topic. Next: **Phase 2** — the TCGplayer-shaped simulator. Follow the phase order and "done when" bars in `implementation-plan.md`.
+Phase 1 (metadata & catalog) complete and verified: recency-scoped Pokémon TCG API loader → Postgres (`card_set` + `card`, Flyway `V1__catalog.sql`) + compacted `card-metadata` topic; `GET /api/cards` (search/filter/paged) and `GET /api/cards/{cardId}`; on-demand `POST /api/admin/catalog/reload` (the loader is off at startup by default — `market.catalog.load-on-startup`). Verified end-to-end against live infra: a set's 122 cards landed in Postgres and the topic.
+
+Phase 2 (simulator) complete and verified: standalone TCGplayer-shaped service (port 8081) that seeds its product universe from the backend's `/api/cards`, mints synthetic numeric `productId`s with a `productId↔cardId` map, and prices each SKU (product × finish × condition) via a geometric random walk. Endpoints: `/catalog/products`, `/pricing/{productId}`, pollable `/listings?since=` & `/sales?since=`, and `/admin/inject/{spike,arbitrage}` + `/admin/catalog/reload` (see implementation-plan.md Appendix E). Verified: seeded 122 products / 1510 SKUs, steady ~200 eps with `since=` polling, and injections produced observable spike/arbitrage anomalies. Next: **Phase 3** — ingestion poller (simulator REST → Kafka). Follow the phase order and "done when" bars in `implementation-plan.md`.
 
 ## Workflow
 

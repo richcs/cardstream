@@ -1,9 +1,29 @@
 spring:
   application:
     name: cardstream-simulator
+  task:
+    scheduling:
+      pool:
+        size: 2
 
 server:
   port: ${SERVER_PORT:8081}
+
+# Marketplace simulator tunables.
+simulator:
+  backend:
+    base-url: ${SIMULATOR_BACKEND_BASE_URL:http://localhost:8080}
+    seed-retry-attempts: 30
+    seed-retry-delay-ms: 2000
+  feed:
+    events-per-second: 200
+    sale-ratio: 0.3
+    retention: 5m
+    default-limit: 1000
+  walk:
+    sigma: 0.02
+    drift: 0.0
+  conditions: [NM, LP, MP, HP, DMG]
 
 management:
   endpoints:
