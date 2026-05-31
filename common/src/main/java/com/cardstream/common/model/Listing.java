@@ -6,6 +6,7 @@ import java.time.Instant;
 /** A card offered for sale on the marketplace. Published to the `listings` topic. */
 public record Listing(
         String eventId,
+        String source,
         String cardId,
         Finish finish,
         Condition condition,

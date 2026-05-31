@@ -6,6 +6,7 @@ import java.time.Instant;
 /** A price change on an existing listing. Published to the `price-updates` topic. */
 public record PriceUpdate(
         String eventId,
+        String source,
         String cardId,
         Finish finish,
         Condition condition,

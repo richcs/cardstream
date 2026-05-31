@@ -6,6 +6,7 @@ import java.time.Instant;
 /** A completed sale on the marketplace. Published to the `sales` topic. */
 public record Sale(
         String eventId,
+        String source,
         String cardId,
         Finish finish,
         Condition condition,

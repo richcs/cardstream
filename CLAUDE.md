@@ -86,4 +86,4 @@ Phase 2 (simulator) complete and verified: standalone TCGplayer-shaped service (
 
 - Match the existing code's style and altitude; keep comments sparse and purposeful.
 - When you add a topic, an event field, an endpoint, or a threshold, update the matching appendix in `implementation-plan.md` so the docs stay the source of truth.
-- Commit/push only when asked. This is not yet a git repo.
+- Commit/push only when asked. The repo is git-tracked; work lands on `master`.

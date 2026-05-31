@@ -47,10 +47,9 @@ cardstream/
 │   ├── sink/                    # Kafka→Postgres consumer
 │   └── metadata/                # Pokémon TCG API loader + catalog
 ├── simulator/                   # standalone Spring Boot: TCGplayer-shaped API + price engine
-├── frontend/                    # React + TS + Vite
-└── db/migration/                # Flyway SQL
+└── frontend/                    # React + TS + Vite
 ```
-> `backend` is one Spring Boot process (Kafka Streams + REST + consumers co-located — normal for this scale). `simulator` is a separate process/container to keep the external-feed boundary honest.
+> `backend` is one Spring Boot process (Kafka Streams + REST + consumers co-located — normal for this scale). `simulator` is a separate process/container to keep the external-feed boundary honest. Flyway migrations live on the backend classpath at `backend/src/main/resources/db/migration/` (see Appendix D), not at the repo root.
 
 ---
 
@@ -58,17 +57,17 @@ cardstream/
 
 ### Phase 0 — Scaffolding & infra
 - Monorepo, Gradle multi-module, `common` module, code style/CI.
-- `docker-compose.yml`: Kafka (KRaft) **or** Redpanda, Postgres 16, (placeholders for backend/simulator/frontend).
+- `docker-compose.yml`: Kafka (KRaft) **or** Redpanda, Postgres 17, (placeholders for backend/simulator/frontend).
 - Topic creation (auto-create off in prod-style; create via init script): `listings`, `sales`, `price-updates`, `card-metadata` (compacted), `agg-price-windowed`, `arbitrage`, `alerts`.
 - Spring Boot skeletons for `backend` and `simulator`; Actuator health.
 - **Done when:** `docker compose up` brings up Kafka + Postgres; both apps start and report healthy; topics exist.
 
 ### Phase 1 — Metadata & catalog
-- `metadata` module: load Pokémon TCG API → Postgres `card` table; publish each card to compacted `card-metadata` topic.
-- **Recency-scoped load (set-driven):** enumerate `/v2/sets?orderBy=-releaseDate`, keep sets with `releaseDate >= market.catalog.since-release-date` (default `2024-01-01`), then page `/v2/cards?q=set.id:<id>` per kept set. Set-driven so the `set` table is populated cleanly and older sets can be backfilled later by lowering the cutoff. Cutoff lives in `application.yml` under `market.catalog.*`.
-- Flyway migration for `card` (+ `set`) tables.
-- REST: `GET /api/cards` (search/filter), `GET /api/cards/{cardId}`.
-- **Done when:** recent catalog seeded (sets since cutoff, low thousands of cards), search/filter works, `card-metadata` topic populated.
+- `metadata` package (in `backend`): load Pokémon TCG API → Postgres `card_set` + `card` tables; publish each card to the compacted `card-metadata` topic.
+- **Recency-scoped load (set-driven):** enumerate `/v2/sets?orderBy=-releaseDate`, keep sets with `releaseDate >= market.catalog.since-release-date` (default `2024-01-01`), then page `/v2/cards?q=set.id:<id>` per kept set. Set-driven so the `card_set` table is populated cleanly and older sets can be backfilled later by lowering the cutoff. Cutoff lives in `application.yml` under `market.catalog.*`.
+- Flyway migration (`V1__catalog.sql`) for `card_set` + `card`.
+- REST: `GET /api/cards` (search/filter), `GET /api/cards/{cardId}`; on-demand `POST /api/admin/catalog/reload`.
+- **Done when:** recent catalog seeded (sets since cutoff, low thousands of cards), search/filter works, `card-metadata` topic populated. ✅ Verified: a set's 122 cards landed in Postgres and the topic.
 
 ### Phase 2 — Simulator (TCGplayer-shaped feed)
 - Standalone service, **seeded from the backend's `GET /api/cards`** at startup (retries while the backend warms up; reseed via `POST /admin/catalog/reload`). Shares `common` for the enums.
@@ -78,10 +77,31 @@ cardstream/
 - Admin endpoints to **inject** a price spike (multiplicative jump + sale burst) or an arbitrage listing (single below-market listing) on demand: `POST /admin/inject/spike`, `POST /admin/inject/arbitrage`.
 - **Done when:** simulator emits a steady, pollable stream; injection endpoints produce observable anomalies. ✅ Verified: seeded 122 products / 1510 SKUs from the backend, steady ~200+ eps with working `since=` polling, spike jumped a SKU 3× with a sale burst, arbitrage produced a 0.6× below-market listing in the feed.
 
-### Phase 3 — Ingestion
-- `ingestion` module: scheduled poller hits the simulator's REST endpoints, diffs/normalizes, and produces `listing` / `sale` / `price-update` events to Kafka keyed by `(cardId, finish, condition)`.
-- Idempotency/dedup by `eventId`; map simulator fields → canonical event schema (Appendix A).
-- **Done when:** events flow to Kafka at target rate; consumer-lag and counts visible in Actuator/metrics.
+### Phase 3 — Ingestion (multi-source)
+Designed around a **source port/adapter** so the topology never knows where events came from; sources are pluggable and can run **concurrently**.
+
+- **Port:** a `MarketDataSource` interface — `id()` + `poll(cursor)` returning **already-normalized** canonical `Listing`/`Sale` events (Appendix A) plus the advanced cursor. Each adapter owns its own `productId → cardId` and `subTypeName → Finish` mapping, so normalization is the adapter's job, not the poller's.
+- **Registry + poller:** a scheduled `SourcePoller` iterates the **enabled** sources from `ingestion.sources.*`, polls each with its own persisted **cursor** (per-feed max event timestamp), and produces to Kafka keyed by `MarketKey`. Each event is tagged with its `source`.
+- **One adapter, two sources:** because the simulator is TCGplayer-shaped, a single `TcgplayerRestSource` adapter (parameterized by `base-url` + auth) serves both the simulator (`sim`) now and real TCGplayer later — adding TCGplayer is config-only. MVP enables `sim` only.
+- **Dedup/idempotency:** keyed by `source + eventId` (a bounded per-source recent-id cache guards against `since=` overlap re-delivery); the Kafka producer is idempotent.
+- **Source-agnostic downstream:** `MarketKey` (and thus windows, joins, aggregates) carry no source dimension — a card is one ticker across sources, which keeps cross-source aggregation/arbitrage open as a later option.
+- Config sketch:
+  ```yaml
+  ingestion:
+    poll-interval: 2s
+    sources:
+      sim:        { enabled: true,  type: tcgplayer-rest, base-url: http://localhost:8081 }
+      tcgplayer:  { enabled: false, type: tcgplayer-rest, base-url: https://api.tcgplayer.com, api-key: ... }
+  ```
+- **Scaling / deployment:** MVP runs ingestion **in the backend process**, single instance, registry polling all enabled sources (add per-source timeouts + a circuit breaker so one bad source can't stall the loop). The same binary supports **one-instance-per-source** later by enabling a single source per instance — provided per-source cursor/dedup/metrics state stays source-keyed (no shared mutable state). The prerequisite for that split is **extracting ingestion into its own deployable** (separate app/profile), since the backend process also owns the single-logical Streams topology + serving. Safe to scale because ingestion are **producers** (not bound by the 6-partition limit) and every event is keyed by `MarketKey` (per-ticker ordering preserved); the only rule is **one owner per source** — never two instances polling the same source without sharding.
+- **Trust boundary & input validation:** the ingestor is the trust boundary — every field a source returns is untrusted, and poisoned input becomes corrupted prices/alerts/arbitrage. The adapter validates (and quarantines on failure) **before** producing to Kafka:
+  - **Catalog allowlist** — only ingest events whose resolved `cardId` exists in the catalog; drop unknown cards (kills key-forgery, junk tickers, and unbounded state-store cardinality). Optionally scope each source to a declared card universe — the main mitigation for the source-agnostic `MarketKey` (any trusted source can otherwise move *any* ticker).
+  - **Value checks** — `price` positive/finite/scale-bounded within sane min–max; `quantity` positive/bounded; reject NaN/negative/zero. Sanitize/reject the `|` delimiter and control chars in identifiers; validate `finish`/`condition` against the enums.
+  - **Timestamp clamping** — the custom `TimestampExtractor` rejects/clamps event times outside a plausible skew window (not far-future, not absurdly old) so a source can't prematurely advance stream time and close windows early; derive the poller cursor so a future-dated event can't skip later legitimate ones.
+  - **Transport & payload limits** — HTTPS + cert verification for real sources; connect/read timeouts (anti slow-loris); max response size + Jackson `StreamReadConstraints` (nesting/array/string caps); bounded connection pool and max-events-per-poll.
+  - **Dedup & isolation** — `source + eventId` dedup with a bounded cache; idempotent producer; cursor owned poller-side; per-source timeouts + circuit breaker; a quarantine/dead-letter path for rejected events.
+  - **Defense in depth + detection** — the `minSamples=20` gate + window suppression already blunt single-event poisoning; consider clamping extreme outliers before aggregation. Emit per-source metrics (reject rate, parse errors, out-of-bounds counts, event rate) and alert when a feed's own behavior shifts. Note: channel auth (API key/mTLS) proves *who* sent data, not that it's *correct* — it complements, never replaces, validation.
+- **Done when:** events flow to Kafka at target rate from the `sim` source (tagged `source=sim`); a second source can be enabled by config alone; out-of-bounds / unknown-card / malformed events are rejected (and counted) rather than ingested; consumer-lag and counts visible in Actuator/metrics.
 
 ### Phase 4 — Kafka Streams topology (the core)
 - Windowed aggregation: hourly **tumbling** + daily; **hopping** (24h advancing 1h) for moving average/volatility.
@@ -118,17 +138,19 @@ cardstream/
 
 Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 
+`source` identifies the ingestion source (e.g. `"sim"`, `"tcgplayer"`); dedup is keyed by `source + eventId`. `marketKey` stays source-agnostic so a card is one ticker across sources.
+
 ```jsonc
 // listings
-{ "eventId": "uuid", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
+{ "eventId": "uuid", "source": "sim", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
   "price": 412.50, "quantity": 2, "sellerId": "s-123", "listedAt": "2026-05-30T12:00:00Z" }
 
 // sales
-{ "eventId": "uuid", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
+{ "eventId": "uuid", "source": "sim", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
   "price": 405.00, "quantity": 1, "soldAt": "2026-05-30T12:01:30Z" }
 
 // price-updates
-{ "eventId": "uuid", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
+{ "eventId": "uuid", "source": "sim", "cardId": "base1-4", "finish": "HOLOFOIL", "condition": "NM",
   "oldPrice": 420.00, "newPrice": 412.50, "listingId": "l-987", "updatedAt": "2026-05-30T12:00:05Z" }
 
 // card-metadata (compacted; key = cardId)
