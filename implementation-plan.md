@@ -77,8 +77,10 @@ cardstream/
 - Admin endpoints to **inject** a price spike (multiplicative jump + sale burst) or an arbitrage listing (single below-market listing) on demand: `POST /admin/inject/spike`, `POST /admin/inject/arbitrage`.
 - **Done when:** simulator emits a steady, pollable stream; injection endpoints produce observable anomalies. ✅ Verified: seeded 122 products / 1510 SKUs from the backend, steady ~200+ eps with working `since=` polling, spike jumped a SKU 3× with a sale burst, arbitrage produced a 0.6× below-market listing in the feed.
 
-### Phase 3 — Ingestion (multi-source)
+### Phase 3 — Ingestion (multi-source) ✅
 Designed around a **source port/adapter** so the topology never knows where events came from; sources are pluggable and can run **concurrently**.
+
+Implemented in `backend` package `com.cardstream.backend.ingestion`: `MarketDataSource` port (`id()` + `poll(cursor)`); `TcgplayerRestSource` adapter (parameterized by base-url + auth, with per-source connect/read timeouts); `SourceRegistry` (builds enabled sources from config); `SourcePoller` (programmatic `SchedulingConfigurer` fixed-delay loop — simple-duration `@Scheduled` strings need Spring Framework 6.2, this app is on 6.1; per-source cursor owned poller-side, circuit breaker); `EventValidator` + `CatalogAllowlist` + `RecentIdCache` (the trust boundary); `MarketEventPublisher` (idempotent producer → `listings`/`sales` keyed by `MarketKey`).
 
 - **Port:** a `MarketDataSource` interface — `id()` + `poll(cursor)` returning **already-normalized** canonical `Listing`/`Sale` events (Appendix A) plus the advanced cursor. Each adapter owns its own `productId → cardId` and `subTypeName → Finish` mapping, so normalization is the adapter's job, not the poller's.
 - **Registry + poller:** a scheduled `SourcePoller` iterates the **enabled** sources from `ingestion.sources.*`, polls each with its own persisted **cursor** (per-feed max event timestamp), and produces to Kafka keyed by `MarketKey`. Each event is tagged with its `source`.
@@ -101,7 +103,7 @@ Designed around a **source port/adapter** so the topology never knows where even
   - **Transport & payload limits** — HTTPS + cert verification for real sources; connect/read timeouts (anti slow-loris); max response size + Jackson `StreamReadConstraints` (nesting/array/string caps); bounded connection pool and max-events-per-poll.
   - **Dedup & isolation** — `source + eventId` dedup with a bounded cache; idempotent producer; cursor owned poller-side; per-source timeouts + circuit breaker; a quarantine/dead-letter path for rejected events.
   - **Defense in depth + detection** — the `minSamples=20` gate + window suppression already blunt single-event poisoning; consider clamping extreme outliers before aggregation. Emit per-source metrics (reject rate, parse errors, out-of-bounds counts, event rate) and alert when a feed's own behavior shifts. Note: channel auth (API key/mTLS) proves *who* sent data, not that it's *correct* — it complements, never replaces, validation.
-- **Done when:** events flow to Kafka at target rate from the `sim` source (tagged `source=sim`); a second source can be enabled by config alone; out-of-bounds / unknown-card / malformed events are rejected (and counted) rather than ingested; consumer-lag and counts visible in Actuator/metrics.
+- **Done when:** events flow to Kafka at target rate from the `sim` source (tagged `source=sim`); a second source can be enabled by config alone; out-of-bounds / unknown-card / malformed events are rejected (and counted) rather than ingested; consumer-lag and counts visible in Actuator/metrics. ✅ Verified end-to-end against live infra: ~200+ eps from `sim` into `listings`/`sales` keyed by `MarketKey` and tagged `source=sim` (ISO-8601 timestamps matching Appendix A); circuit breaker opened on a down feed and self-healed; `GET /api/admin/ingestion/status` and `cardstream.ingestion.*` meters show per-source ingested/rejected/duplicate counts; a tightened price bound forced every event to `price_out_of_bounds` (ingested 0, rejected counted) while the cursor still advanced. (Consumer-lag becomes relevant once the Phase 4 Streams topology consumes these topics.)
 
 ### Phase 4 — Kafka Streams topology (the core)
 - Windowed aggregation: hourly **tumbling** + daily; **hopping** (24h advancing 1h) for moving average/volatility.
@@ -165,6 +167,8 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 
 **Enums** — `finish`: `NORMAL | HOLOFOIL | REVERSE_HOLOFOIL`; `condition`: `NM | LP | MP | HP | DMG` (TCGplayer grades); `game`: `POKEMON` (MTG, ONE_PIECE later).
 
+**Serialization** — Kafka JSON values are produced with the application `ObjectMapper` (`KafkaProducerConfig`): timestamps as **ISO-8601** instants (not epoch numbers) and **no `__TypeId__` headers** (consumers deserialize with explicit target types). The producer is **idempotent** (`acks=all`).
+
 ---
 
 ## Appendix B — API surface (MVP)
@@ -174,6 +178,7 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 | GET | `/api/cards?game=&set=&rarity=&q=&page=&pageSize=` | Search/filter catalog (`set` matches set id; returns `{items,page,pageSize,total}`) |
 | GET | `/api/cards/{cardId}` | Card detail (current market state layered on in Phase 5); 404 if unknown |
 | POST | `/api/admin/catalog/reload` | Seed/refresh the catalog from the Pokémon TCG API (sets since the configured cutoff) → Postgres + `card-metadata` topic |
+| GET | `/api/admin/ingestion/status` | Per-source ingestion health: cursor positions, ingested/rejected/duplicate counts, circuit state |
 | GET | `/api/cards/{cardId}/history?window=hourly\|daily&from=&to=` | Price/volume history |
 | GET | `/api/market/{marketKey}` | Current state for one ticker (Interactive Query) |
 | GET | `/api/top-movers?window=daily&dir=gainers\|losers&limit=` | Biggest movers |

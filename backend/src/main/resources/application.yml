@@ -13,6 +13,11 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      # Idempotent producer (exactly-once per partition). JSON value serialization (ISO-8601 instants,
+      # no type headers) is wired in KafkaProducerConfig so the wire format matches the event schema.
+      properties:
+        enable.idempotence: true
+      acks: all
 
 server:
   port: ${SERVER_PORT:8080}
@@ -25,6 +30,30 @@ market:
     since-release-date: 2024-01-01
     page-size: 250
     load-on-startup: false
+
+# Multi-source ingestion. The poller runs only enabled sources; a second feed (real TCGplayer)
+# is added by config alone. The ingestor is the trust boundary — `validation.*` bounds every event.
+ingestion:
+  enabled: ${INGESTION_ENABLED:true}
+  poll-interval: 2s
+  validation:
+    min-price: 0.01
+    max-price: 1000000
+    max-quantity: 10000
+    max-future-skew: 5m
+    max-age: 365d
+    max-price-scale: 2
+  sources:
+    sim:
+      enabled: true
+      type: tcgplayer-rest
+      base-url: ${INGESTION_SIM_BASE_URL:http://localhost:8081}
+      max-events-per-poll: 1000
+    tcgplayer:
+      enabled: false
+      type: tcgplayer-rest
+      base-url: https://api.tcgplayer.com
+      # api-key: <set when enabling>
 
 management:
   endpoints:

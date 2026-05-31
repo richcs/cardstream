@@ -11,3 +11,7 @@ spring:
 market:
   catalog:
     load-on-startup: false
+
+# No live simulator/broker in the context-load test — keep the poller idle.
+ingestion:
+  enabled: false

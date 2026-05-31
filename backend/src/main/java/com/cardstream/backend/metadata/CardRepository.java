@@ -3,8 +3,10 @@ package com.cardstream.backend.metadata;
 import com.cardstream.backend.metadata.dto.TcgApiDtos.Card;
 import com.cardstream.common.model.Game;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -67,6 +69,11 @@ public class CardRepository {
     public long count() {
         Long c = jdbc.queryForObject("SELECT count(*) FROM card", Long.class);
         return c == null ? 0L : c;
+    }
+
+    /** All known card ids — the ingestion allowlist (only events for catalogued cards are ingested). */
+    public Set<String> allIds() {
+        return new HashSet<>(jdbc.queryForList("SELECT card_id FROM card", String.class));
     }
 
     public Optional<CardView> findById(String cardId) {
