@@ -65,9 +65,10 @@ cardstream/
 
 ### Phase 1 — Metadata & catalog
 - `metadata` module: load Pokémon TCG API → Postgres `card` table; publish each card to compacted `card-metadata` topic.
+- **Recency-scoped load (set-driven):** enumerate `/v2/sets?orderBy=-releaseDate`, keep sets with `releaseDate >= market.catalog.since-release-date` (default `2024-01-01`), then page `/v2/cards?q=set.id:<id>` per kept set. Set-driven so the `set` table is populated cleanly and older sets can be backfilled later by lowering the cutoff. Cutoff lives in `application.yml` under `market.catalog.*`.
 - Flyway migration for `card` (+ `set`) tables.
 - REST: `GET /api/cards` (search/filter), `GET /api/cards/{cardId}`.
-- **Done when:** catalog seeded (~2k cards), search/filter works, `card-metadata` topic populated.
+- **Done when:** recent catalog seeded (sets since cutoff, low thousands of cards), search/filter works, `card-metadata` topic populated.
 
 ### Phase 2 — Simulator (TCGplayer-shaped feed)
 - Standalone service seeded from the catalog (shares `common` + reads Pokémon TCG API or a snapshot).
@@ -147,8 +148,9 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/cards?game=&set=&rarity=&condition=&q=&page=` | Search/filter catalog |
-| GET | `/api/cards/{cardId}` | Card detail + current market state (all finishes/conditions) |
+| GET | `/api/cards?game=&set=&rarity=&q=&page=&pageSize=` | Search/filter catalog (`set` matches set id; returns `{items,page,pageSize,total}`) |
+| GET | `/api/cards/{cardId}` | Card detail (current market state layered on in Phase 5); 404 if unknown |
+| POST | `/api/admin/catalog/reload` | Seed/refresh the catalog from the Pokémon TCG API (sets since the configured cutoff) → Postgres + `card-metadata` topic |
 | GET | `/api/cards/{cardId}/history?window=hourly\|daily&from=&to=` | Price/volume history |
 | GET | `/api/market/{marketKey}` | Current state for one ticker (Interactive Query) |
 | GET | `/api/top-movers?window=daily&dir=gainers\|losers&limit=` | Biggest movers |
@@ -172,15 +174,16 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 | Arbitrage | `listing.price < (1 − 0.15) × rollingAvg`, gated by `minSamples` |
 | Cold start | `minSamples = 20` before spike/arbitrage can fire |
 
-All thresholds live in `application.yml` (`market.thresholds.*`).
+All thresholds live in `application.yml` (`market.thresholds.*`). Catalog scope lives under `market.catalog.*` — `since-release-date` (default `2024-01-01`) bounds which sets the metadata loader ingests; lower it to backfill older cards.
 
 ---
 
 ## Appendix D — Postgres schema (serving store)
 
-- `card(card_id PK, name, set, rarity, game, image_url, ...)`
+- `card_set(set_id PK, name, series, printed_total, total, release_date, logo_url, symbol_url, updated_at)` — `set` is reserved in SQL, so the table is `card_set`.
+- `card(card_id PK, set_id FK→card_set, name, number, rarity, supertype, image_small, image_large, game, updated_at)`
 - `price_window(market_key, window_type, window_start, avg_price, volume, ma, volatility, PK(market_key,window_type,window_start))`
 - `alert(alert_id PK, type, severity, card_id, market_key, detail JSONB, ts)`
 - `watchlist(user_id, card_id, created_at, PK(user_id, card_id))`
 
-Migrations via Flyway in `db/migration/`.
+Migrations via Flyway on the backend classpath at `backend/src/main/resources/db/migration/` (default `classpath:db/migration`) — so they ship in the jar and run identically in the IDE, Docker, and tests. `V1__catalog.sql` creates `card_set` + `card`.

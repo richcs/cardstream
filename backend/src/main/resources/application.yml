@@ -1,11 +1,30 @@
 spring:
   application:
     name: cardstream-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/cardstream}
+    username: ${SPRING_DATASOURCE_USERNAME:cardstream}
+    password: ${SPRING_DATASOURCE_PASSWORD:cardstream}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
 server:
   port: ${SERVER_PORT:8080}
+
+# Catalog scope + Pokémon TCG API. Lower since-release-date to backfill older sets.
+market:
+  catalog:
+    api-base-url: ${POKEMONTCG_API_BASE:https://api.pokemontcg.io/v2}
+    api-key: ${POKEMONTCG_API_KEY:}
+    since-release-date: 2024-01-01
+    page-size: 250
+    load-on-startup: false
 
 management:
   endpoints:

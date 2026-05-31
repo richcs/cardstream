@@ -73,7 +73,7 @@ curl http://localhost:8081/actuator/health   # simulator
 
 ## Status
 
-Phase 0 (scaffolding + infra) complete and verified. Next: **Phase 1** — Pokémon TCG API metadata loader → Postgres catalog + `card-metadata` topic, `GET /api/cards` search/detail, first Flyway migration. Follow the phase order and "done when" bars in `implementation-plan.md`.
+Phase 1 (metadata & catalog) complete and verified: recency-scoped Pokémon TCG API loader → Postgres (`card_set` + `card`, Flyway `V1__catalog.sql`) + compacted `card-metadata` topic; `GET /api/cards` (search/filter/paged) and `GET /api/cards/{cardId}`; on-demand `POST /api/admin/catalog/reload` (the loader is off at startup by default — `market.catalog.load-on-startup`). Verified end-to-end against live infra: a set's 122 cards landed in Postgres and the topic. Next: **Phase 2** — the TCGplayer-shaped simulator. Follow the phase order and "done when" bars in `implementation-plan.md`.
 
 ## Workflow
 

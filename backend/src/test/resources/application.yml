@@ -1,0 +1,13 @@
+# Test profile: context-load smoke test runs offline.
+# In-memory H2 stands in for Postgres; Flyway is disabled (no schema needed to verify wiring).
+spring:
+  datasource:
+    url: jdbc:h2:mem:cardstream;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+  flyway:
+    enabled: false
+
+market:
+  catalog:
+    load-on-startup: false
