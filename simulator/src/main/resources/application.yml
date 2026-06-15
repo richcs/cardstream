@@ -16,7 +16,7 @@ simulator:
     seed-retry-attempts: 30
     seed-retry-delay-ms: 2000
   feed:
-    events-per-second: 200
+    events-per-second: 100
     sale-ratio: 0.3
     retention: 5m
     default-limit: 1000
