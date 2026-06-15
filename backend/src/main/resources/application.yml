@@ -18,6 +18,10 @@ spring:
       properties:
         enable.idempotence: true
       acks: all
+    streams:
+      # Phase 4 topology. application-id namespaces the consumer group + internal topics/state stores.
+      # Serdes, timestamp extractor, and other settings are set in KafkaStreamsTopologyConfig.
+      application-id: ${KAFKA_STREAMS_APP_ID:cardstream-streams}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -30,6 +34,11 @@ market:
     since-release-date: 2024-01-01
     page-size: 250
     load-on-startup: false
+  # Streams topology thresholds (Appendix C). min-samples is the cold-start gate for spike/arbitrage.
+  thresholds:
+    spike-sigma: 3.0
+    arbitrage-margin: 0.15
+    min-samples: 20
 
 # Multi-source ingestion. The poller runs only enabled sources; a second feed (real TCGplayer)
 # is added by config alone. The ingestor is the trust boundary — `validation.*` bounds every event.

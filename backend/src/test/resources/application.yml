@@ -7,6 +7,10 @@ spring:
     password: ""
   flyway:
     enabled: false
+  kafka:
+    streams:
+      # The topology is built (verifying wiring) but not started — no broker in the smoke test.
+      auto-startup: false
 
 market:
   catalog:

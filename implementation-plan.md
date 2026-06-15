@@ -105,7 +105,9 @@ Implemented in `backend` package `com.cardstream.backend.ingestion`: `MarketData
   - **Defense in depth + detection** — the `minSamples=20` gate + window suppression already blunt single-event poisoning; consider clamping extreme outliers before aggregation. Emit per-source metrics (reject rate, parse errors, out-of-bounds counts, event rate) and alert when a feed's own behavior shifts. Note: channel auth (API key/mTLS) proves *who* sent data, not that it's *correct* — it complements, never replaces, validation.
 - **Done when:** events flow to Kafka at target rate from the `sim` source (tagged `source=sim`); a second source can be enabled by config alone; out-of-bounds / unknown-card / malformed events are rejected (and counted) rather than ingested; consumer-lag and counts visible in Actuator/metrics. ✅ Verified end-to-end against live infra: ~200+ eps from `sim` into `listings`/`sales` keyed by `MarketKey` and tagged `source=sim` (ISO-8601 timestamps matching Appendix A); circuit breaker opened on a down feed and self-healed; `GET /api/admin/ingestion/status` and `cardstream.ingestion.*` meters show per-source ingested/rejected/duplicate counts; a tightened price bound forced every event to `price_out_of_bounds` (ingested 0, rejected counted) while the cursor still advanced. (Consumer-lag becomes relevant once the Phase 4 Streams topology consumes these topics.)
 
-### Phase 4 — Kafka Streams topology (the core)
+### Phase 4 — Kafka Streams topology (the core) 🚧
+Implemented in `backend` package `com.cardstream.backend.streams`: a plain, test-driveable `MarketTopology` (built into the Spring-managed `StreamsBuilder` by `KafkaStreamsTopologyConfig`, `@EnableKafkaStreams` + a `KafkaStreamsConfiguration` bean), a custom event-time `EventTimeExtractor` (reads `soldAt`/`listedAt`), `MarketStats` (incremental count/sum/sumSq accumulator → mean/stddev), a `SpikeDetector` Processor-API node, `JsonSerdes` (app `ObjectMapper`, no type headers), and `ThresholdProperties` (`market.thresholds.*`). New topic schema records live in `common`: `WindowedAggregate`, `ArbitrageFlag`, `WindowType` (see Appendix A).
+
 - Windowed aggregation: hourly **tumbling** + daily; **hopping** (24h advancing 1h) for moving average/volatility.
 - Moving average & volatility (stddev) over the trailing window per card.
 - **Arbitrage**: KStream(`listings`)–KTable(rolling avg) join → `arbitrage` topic when `price < (1−0.15)×avg` and `sampleCount ≥ minSamples`.
@@ -114,7 +116,7 @@ Implemented in `backend` package `com.cardstream.backend.ingestion`: `MarketData
 - **Branching**: split alerts by severity; structure topology so per-game routing is ready.
 - **Enrichment**: GlobalKTable(`card-metadata`) join so alerts/aggregates carry card name/set/image.
 - **Spring integration** (context7-verified for spring-kafka 3.2.x): `@EnableKafkaStreams` + a `KafkaStreamsConfiguration` bean (name = `KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME`); define the topology in `@Bean` methods taking an injected `StreamsBuilder` (lifecycle managed by `StreamsBuilderFactoryBean`). Set `DEFAULT_TIMESTAMP_EXTRACTOR_CLASS_CONFIG` to a **custom event-time `TimestampExtractor`** that reads `soldAt`/`listedAt` (do *not* use `WallclockTimestampExtractor`).
-- **Done when:** TopologyTestDriver tests pass for each operator; injected spike/arbitrage from Phase 2 produce correct alerts end-to-end.
+- **Done when:** TopologyTestDriver tests pass for each operator; injected spike/arbitrage from Phase 2 produce correct alerts end-to-end. 🚧 TopologyTestDriver bar met: per-operator tests green (spike fires past `minSamples`/σ and is suppressed below them; arbitrage flags a below-margin listing and respects the margin; hourly windowed aggregate emits exactly one settled result on window close; GlobalKTable enrichment attaches the card name). **Pending:** end-to-end verification against live infra (inject spike/arbitrage from the simulator → assert `alerts`/`arbitrage`/`agg-price-windowed` populate).
 
 ### Phase 5 — Serving & query
 - Interactive Queries via Spring Kafka's **`KafkaStreamsInteractiveQueryService`** (3.2+ facade — don't hand-roll store/host lookup): `GET /api/market/{marketKey}`, `GET /api/cards/{cardId}` current state across finishes/conditions.
@@ -163,7 +165,21 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 { "alertId": "uuid", "type": "SPIKE | ARBITRAGE", "severity": "LOW|MED|HIGH",
   "cardId": "base1-4", "marketKey": "base1-4|HOLOFOIL|NM", "name": "Charizard",
   "detail": { "...": "..." }, "ts": "2026-05-30T12:01:31Z" }
+
+// agg-price-windowed (key = marketKey) — one settled emit per closed window (suppressed)
+{ "marketKey": "base1-4|HOLOFOIL|NM", "cardId": "base1-4",
+  "windowType": "HOURLY | DAILY | MA_24H", "windowStart": "2026-05-30T12:00:00Z",
+  "windowEnd": "2026-05-30T13:00:00Z", "avgPrice": 408.75, "volatility": 12.4,
+  "volume": 37, "sampleCount": 31 }
+
+// arbitrage (key = marketKey) — a listing below the rolling average
+{ "marketKey": "base1-4|HOLOFOIL|NM", "cardId": "base1-4", "finish": "HOLOFOIL",
+  "condition": "NM", "source": "sim", "sellerId": "s-123", "listingPrice": 300.00,
+  "referenceAvg": 408.75, "discountPct": 0.2661, "sampleCount": 31,
+  "detectedAt": "2026-05-30T12:00:00Z" }
 ```
+
+`avgPrice` on `MA_24H` is the trailing moving average; `volatility` is the stddev over the same window. Spike/arbitrage are gated by `minSamples` (cold start) — see Appendix C. The `alerts` feed carries both spike and arbitrage alerts (metadata-enriched, branched by severity); `arbitrage` is the raw flag the join produces.
 
 **Enums** — `finish`: `NORMAL | HOLOFOIL | REVERSE_HOLOFOIL`; `condition`: `NM | LP | MP | HP | DMG` (TCGplayer grades); `game`: `POKEMON` (MTG, ONE_PIECE later).
 
