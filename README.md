@@ -5,6 +5,7 @@ intelligence (prices, moving averages, volatility, arbitrage, spike alerts) with
 
 - **What** → [`project-scope.md`](project-scope.md)
 - **How (stack)** → [`tech-stack.md`](tech-stack.md)
+- **How (architecture + streams topology)** → [`architecture.md`](architecture.md)
 - **Build plan** → [`implementation-plan.md`](implementation-plan.md)
 
 ## Modules

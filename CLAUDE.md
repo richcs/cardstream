@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Guidance for working in this repo. Read alongside `project-scope.md` (what), `tech-stack.md` (how), and `implementation-plan.md` (build plan + event schemas, API surface, metric formulas).
+Guidance for working in this repo. Read alongside `project-scope.md` (what), `tech-stack.md` (how), `architecture.md` (how the pieces fit + the streams topology), and `implementation-plan.md` (build plan + event schemas, API surface, metric formulas).
 
 ## What this is
 
