@@ -9,10 +9,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * The set of catalogued card ids that ingestion is allowed to emit. Only events whose resolved
- * {@code cardId} is in the catalog are ingested — this kills key-forgery, junk tickers, and
- * unbounded state-store cardinality from a misbehaving source. Backed by Postgres and refreshed on a
- * short TTL so a catalog reload is picked up without a restart.
+ * Catalogued card ids ingestion is allowed to emit — kills key-forgery, junk tickers, and unbounded
+ * state-store cardinality from a misbehaving source. Backed by Postgres, refreshed on a short TTL.
  */
 @Component
 public class CatalogAllowlist {

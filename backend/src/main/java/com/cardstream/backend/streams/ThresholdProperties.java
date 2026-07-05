@@ -4,9 +4,8 @@ import java.math.BigDecimal;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Market-intelligence thresholds (configurable under {@code market.thresholds.*}). {@code minSamples}
- * is the cold-start gate: spike/arbitrage cannot fire for a ticker until it has accumulated that many
- * samples, which blunts single-event poisoning.
+ * Market-intelligence thresholds ({@code market.thresholds.*}). {@code minSamples} is the cold-start
+ * gate: spike/arbitrage can't fire until a ticker has that many samples.
  */
 @ConfigurationProperties(prefix = "market.thresholds")
 public record ThresholdProperties(

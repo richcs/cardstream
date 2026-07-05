@@ -14,9 +14,8 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-SKU price state driven by a geometric (log-normal) random walk, so prices stay positive and
- * move multiplicatively. Each SKU's starting price is seeded deterministically from rarity, finish,
- * and condition; spikes apply an instantaneous multiplicative jump.
+ * Per-SKU price state driven by a geometric (log-normal) random walk. Each SKU's starting price is
+ * seeded deterministically from rarity, finish, and condition.
  */
 @Component
 public class PriceEngine {

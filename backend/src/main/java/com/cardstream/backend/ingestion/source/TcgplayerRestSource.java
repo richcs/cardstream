@@ -21,14 +21,8 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 /**
- * Adapter for any TCGplayer-shaped REST feed. Parameterized by base-url + optional api-key, so the
- * same code serves the in-house simulator (id {@code "sim"}) now and real TCGplayer later — adding
- * the latter is config-only.
- *
- * <p>Normalization is the adapter's job: it resolves the upstream numeric {@code productId} to our
- * {@code cardId} via the upstream catalog, and maps {@code subTypeName} to {@link Finish}. Events it
- * can't resolve are dropped and counted (the poller-side validator separately enforces the catalog
- * allowlist + value bounds — defense in depth).
+ * Adapter for any TCGplayer-shaped REST feed, parameterized by base-url + optional api-key. Resolves
+ * the upstream {@code productId}/{@code subTypeName} to our {@code cardId}/{@link Finish}.
  */
 public class TcgplayerRestSource implements MarketDataSource {
 

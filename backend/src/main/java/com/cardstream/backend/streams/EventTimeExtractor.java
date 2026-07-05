@@ -7,12 +7,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.streams.processor.TimestampExtractor;
 
 /**
- * Event-time extractor: stream time is driven by {@code soldAt}/{@code listedAt}, not wall clock, so
- * windows reflect when trades happened. Non-market records (compacted {@code card-metadata}, internal
- * repartition topics) and any record missing an event time fall back to the broker record timestamp.
- *
- * <p>The ingestion trust boundary already clamps event times to a plausible skew window before
- * producing, so a malicious feed can't advance stream time here and close windows early.
+ * Event-time extractor: stream time is driven by {@code soldAt}/{@code listedAt}, not wall clock.
+ * Non-market records and any record missing an event time fall back to the broker record timestamp.
  */
 public class EventTimeExtractor implements TimestampExtractor {
 

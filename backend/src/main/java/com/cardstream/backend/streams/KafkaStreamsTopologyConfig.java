@@ -18,10 +18,8 @@ import org.springframework.kafka.config.StreamsBuilderFactoryBean;
 import org.springframework.kafka.streams.KafkaStreamsInteractiveQueryService;
 
 /**
- * Kafka Streams wiring (spring-kafka): {@link EnableKafkaStreams} plus the required
- * {@link KafkaStreamsConfiguration} bean; the {@code StreamsBuilderFactoryBean} manages the lifecycle
- * and injects the shared {@link StreamsBuilder} into {@link #marketTopology}. Time is event-time via
- * {@link EventTimeExtractor} (not wall clock).
+ * Kafka Streams wiring: {@link EnableKafkaStreams} plus the required {@link KafkaStreamsConfiguration}
+ * bean, feeding the shared {@link StreamsBuilder} into {@link #marketTopology}.
  */
 @Configuration
 @EnableKafkaStreams
@@ -56,7 +54,7 @@ public class KafkaStreamsTopologyConfig {
         return topology;
     }
 
-    /** Phase 5: hot reads off the topology's state stores (see {@code MarketQueryService}). */
+    /** Hot reads off the topology's state stores (see {@code MarketQueryService}). */
     @Bean
     KafkaStreamsInteractiveQueryService kafkaStreamsInteractiveQueryService(
             StreamsBuilderFactoryBean streamsBuilderFactoryBean) {

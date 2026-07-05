@@ -6,9 +6,8 @@ import java.util.Map;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Ingestion layer configuration. Sources are pluggable and keyed by a logical id under
- * {@code ingestion.sources.*}; the poller runs only the enabled ones. A second source (e.g. real
- * TCGplayer) is added by config alone — no code change — because the adapter is parameterized.
+ * Ingestion config. Sources are pluggable, keyed by a logical id under {@code ingestion.sources.*};
+ * the poller runs only the enabled ones.
  */
 @ConfigurationProperties(prefix = "ingestion")
 public record IngestionProperties(

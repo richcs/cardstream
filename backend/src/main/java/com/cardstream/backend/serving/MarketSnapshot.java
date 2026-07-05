@@ -7,8 +7,7 @@ import java.time.Instant;
 
 /**
  * Current state of one ticker, read live off the topology's rolling reference-stats store (not a
- * closed window) via Interactive Queries. {@code avgPrice}/{@code volatility} are the all-time
- * running mean/stddev since the ticker started trading.
+ * closed window). {@code avgPrice}/{@code volatility} are all-time running mean/stddev.
  */
 public record MarketSnapshot(
         String marketKey,

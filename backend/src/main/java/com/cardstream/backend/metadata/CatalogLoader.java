@@ -13,8 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Set-driven, recency-scoped catalog load: enumerate sets newest-first, keep those released on or
- * after the configured cutoff, then page each kept set's cards into Postgres and the
- * compacted {@code card-metadata} topic. Lower {@code market.catalog.since-release-date} to backfill.
+ * after the configured cutoff, then page each kept set's cards into Postgres and {@code card-metadata}.
  */
 @Service
 public class CatalogLoader {

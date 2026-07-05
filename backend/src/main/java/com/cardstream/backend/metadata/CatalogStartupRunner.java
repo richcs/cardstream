@@ -8,9 +8,8 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Seeds the catalog at boot when {@code market.catalog.load-on-startup=true}.
- * Off by default — the load hits an external API; trigger it explicitly via the admin endpoint
- * (or set the flag) once Kafka + Postgres are up.
+ * Seeds the catalog at boot when {@code market.catalog.load-on-startup=true}. Off by default — the
+ * load hits an external API; trigger it via the admin endpoint instead once infra is up.
  */
 @Component
 @ConditionalOnProperty(prefix = "market.catalog", name = "load-on-startup", havingValue = "true")

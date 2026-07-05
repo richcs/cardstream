@@ -5,8 +5,7 @@ import java.util.Map;
 
 /**
  * Bounded LRU cache of recently-seen event ids for one source — guards against {@code since=} overlap
- * re-delivery (the same event returned on consecutive polls). Eldest ids are evicted past capacity;
- * dedup is best-effort within that window, complementing the idempotent producer.
+ * re-delivery, complementing the idempotent producer.
  */
 public class RecentIdCache {
 

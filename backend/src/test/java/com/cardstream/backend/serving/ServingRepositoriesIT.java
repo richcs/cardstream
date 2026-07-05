@@ -29,9 +29,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Real-Postgres coverage (Flyway-migrated {@code V2__serving.sql}) for the Phase 5 sink/serving
- * repositories: upsert idempotency, history/top-movers derivation, and watchlist scoping. The topology
- * tests already prove the streams side; this proves what lands in — and comes back out of — Postgres.
+ * Real-Postgres coverage for the sink/serving repositories: upsert idempotency, history/top-movers
+ * derivation, and watchlist scoping — what lands in, and comes back out of, Postgres.
  */
 @Testcontainers
 @SpringBootTest(properties = {

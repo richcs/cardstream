@@ -6,13 +6,8 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * A pluggable marketplace feed. An adapter polls its upstream and returns <em>already-normalized</em>
- * canonical events — resolving the upstream's product/printing identifiers to {@code cardId} +
- * {@link com.cardstream.common.model.Finish}/{@link com.cardstream.common.model.Condition} is the
- * adapter's job, so the poller and topology never know where events came from.
- *
- * <p>The cursor is owned by the poller (passed in, advanced poller-side from validated events) so a
- * future-dated event can't skip later legitimate ones. Adapters are stateless with respect to it.
+ * A pluggable marketplace feed. An adapter polls its upstream and returns already-normalized canonical
+ * events; the cursor is owned by the poller (passed in, advanced poller-side) so adapters stay stateless.
  */
 public interface MarketDataSource {
 

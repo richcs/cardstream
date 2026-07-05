@@ -4,9 +4,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * A settled windowed aggregate per {@link MarketKey}, published to the {@code agg-price-windowed}
- * topic (key = {@code marketKey}). {@code avgPrice} is the window mean sale price (the moving average
- * for {@link WindowType#MA_24H}); {@code volatility} is its stddev over the same window.
+ * A settled windowed aggregate per {@link MarketKey}, published to {@code agg-price-windowed}.
+ * {@code avgPrice} is the window mean (the moving average for {@link WindowType#MA_24H}).
  */
 public record WindowedAggregate(
         String marketKey,

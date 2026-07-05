@@ -20,8 +20,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Hot reads off the topology's rolling reference-stats store ({@link MarketTopology#ARB_REFERENCE_STORE})
- * via Spring Kafka's {@link KafkaStreamsInteractiveQueryService} facade — the same table the arbitrage
- * join reads, so "current state" here is exactly what the topology considers a ticker's live average.
+ * via {@link KafkaStreamsInteractiveQueryService} — the same table the arbitrage join reads.
  */
 @Service
 public class MarketQueryService {

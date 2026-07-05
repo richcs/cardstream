@@ -6,9 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Marketplace simulator: stands in for the real TCGplayer feed by exposing a TCGplayer-shaped
- * REST API (catalog/pricing/listings/sales) backed by a price engine. Seeds its product universe
- * from the backend catalog and emits a steady, pollable stream of listing/sale events.
+ * Marketplace simulator: exposes a TCGplayer-shaped REST API (catalog/pricing/listings/sales) backed
+ * by a price engine, seeded from the backend catalog.
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan

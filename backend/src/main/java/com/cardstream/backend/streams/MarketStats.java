@@ -5,10 +5,8 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 /**
- * Incremental sale-price statistics per ticker — the accumulator for every aggregation (windowed and
- * the running arbitrage-reference table) and the spike detector's state. Holds running sums so mean
- * and stddev are computable in O(1) without retaining individual samples. Prices fold into
- * {@code double} for the stats math; callers surface money back as {@code BigDecimal}.
+ * Incremental sale-price statistics per ticker — the accumulator for every aggregation and the spike
+ * detector's state. Holds running sums so mean/stddev are O(1) without retaining individual samples.
  */
 public record MarketStats(
         long count,

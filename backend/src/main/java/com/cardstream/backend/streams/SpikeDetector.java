@@ -16,14 +16,8 @@ import org.apache.kafka.streams.processor.api.Record;
 import org.apache.kafka.streams.state.KeyValueStore;
 
 /**
- * Spike detection over the {@code sales} stream. Each sale is compared against the <em>prior</em>
- * distribution for its ticker (held in a keyed {@link KeyValueStore}); when the deviation exceeds
- * {@code spikeSigma} standard deviations — and the ticker has cleared the {@code minSamples} cold-start
- * gate — a {@link AlertType#SPIKE} alert is forwarded, then the sale folds into the stats.
- *
- * <p>Comparing before folding keeps a sale out of its own baseline. The Processor API (not a DSL
- * stream-table join) is used so the read-evaluate-update order is explicit and free of same-source
- * races.
+ * Spike detection over {@code sales}: compares each sale against the ticker's <em>prior</em>
+ * distribution (a keyed {@link KeyValueStore}), then folds it in.
  */
 class SpikeDetector implements Processor<String, Sale, String, Alert> {
 

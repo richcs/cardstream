@@ -15,9 +15,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 /**
- * Holds the simulator's product universe: products with synthetic numeric IDs, their SKUs
- * (finish × condition), and the {@code productId ↔ cardId} mapping the ingestion poller resolves.
- * Built once from the backend catalog and swapped atomically on reload.
+ * The simulator's product universe: products with synthetic numeric IDs, their SKUs (finish ×
+ * condition), and the {@code productId ↔ cardId} mapping. Swapped atomically on reload.
  */
 @Component
 public class CatalogRegistry {

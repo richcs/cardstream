@@ -20,9 +20,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * Drives the steady feed: every 100ms it emits a slice of the configured per-second rate, advancing
- * a random SKU's price and recording a listing or sale. Also serves the on-demand spike/arbitrage
- * injections that produce deterministic anomalies for the backend to detect.
+ * Drives the steady feed: every 100ms emits a slice of the configured per-second rate, advancing a
+ * random SKU's price and recording a listing or sale. Also serves on-demand spike/arbitrage injections.
  */
 @Component
 public class EventGenerator {

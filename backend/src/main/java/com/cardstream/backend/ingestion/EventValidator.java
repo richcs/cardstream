@@ -11,9 +11,8 @@ import java.time.Instant;
 import org.springframework.stereotype.Component;
 
 /**
- * The trust boundary: every field a source returns is untrusted, and poisoned input becomes corrupted
- * prices/alerts. Each event is checked against the catalog allowlist + configured value/time bounds
- * <em>before</em> it reaches Kafka; rejects are counted (tagged by source + reason) and dropped.
+ * The trust boundary: checks each event against the catalog allowlist + configured value/time bounds
+ * before it reaches Kafka; rejects are counted (tagged by source + reason) and dropped.
  */
 @Component
 public class EventValidator {

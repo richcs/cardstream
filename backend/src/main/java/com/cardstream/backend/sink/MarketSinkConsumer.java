@@ -14,9 +14,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Dedicated Spring Kafka consumer (not Kafka Connect) sinking the topology's settled output to
- * Postgres for history/derived reads, and fanning the same records out to the live WS/SSE feeds.
- * Values are parsed manually with the app {@link ObjectMapper} — the wire format has no type headers
- * (see {@code KafkaProducerConfig}), so a single String-valued consumer factory covers every topic.
+ * Postgres, and fanning the same records out to the live WS/SSE feeds.
  */
 @Component
 public class MarketSinkConsumer {

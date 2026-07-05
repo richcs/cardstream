@@ -68,7 +68,7 @@ services:
       retries: 10
       start_period: 10s
 
-  # --- Application services (build on demand; not required for Phase 0 infra verification) ---
+  # --- Application services (build on demand; not required for basic infra verification) ---
   backend:
     build:
       context: .

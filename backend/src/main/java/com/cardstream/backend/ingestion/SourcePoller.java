@@ -19,10 +19,8 @@ import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.stereotype.Component;
 
 /**
- * Scheduled poll loop over the enabled sources. Each source is polled with its own poller-owned
- * cursor; events are deduped, validated, and produced to Kafka keyed by {@code MarketKey}. Per-source
- * timeouts + a circuit breaker keep one bad feed from stalling the loop; the cursor only advances from
- * past-dated events so a future-dated event can't skip later legitimate ones.
+ * Scheduled poll loop over the enabled sources: each is polled with its own cursor, deduped, validated,
+ * and produced to Kafka keyed by {@code MarketKey}.
  */
 @Component
 public class SourcePoller implements SchedulingConfigurer {
@@ -58,9 +56,8 @@ public class SourcePoller implements SchedulingConfigurer {
     }
 
     /**
-     * Register the poll loop programmatically (rather than {@code @Scheduled(fixedDelayString=...)}) so
-     * we can drive it from the bound {@code Duration} directly — simple duration strings in
-     * {@code @Scheduled} require Spring Framework 6.2, and this app runs on 6.1.
+     * Registered programmatically (not {@code @Scheduled(fixedDelayString=...)}) since simple duration
+     * strings there need Spring Framework 6.2, and this app runs on 6.1.
      */
     @Override
     public void configureTasks(ScheduledTaskRegistrar registrar) {

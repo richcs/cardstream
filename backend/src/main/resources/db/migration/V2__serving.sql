@@ -1,7 +1,6 @@
--- Phase 5 serving store: history (sunk from agg-price-windowed), alerts (sunk from alerts),
--- and per-user watchlists. market_key = "{cardId}|{finish}|{condition}" throughout (never contains
--- '|' inside cardId — rejected at the ingestion trust boundary), so cardId is recoverable via
--- split_part(market_key, '|', 1) without a redundant column.
+-- Serving store: history (sunk from agg-price-windowed), alerts, and per-user watchlists.
+-- market_key = "{cardId}|{finish}|{condition}" throughout (never contains '|' inside cardId —
+-- rejected at the ingestion trust boundary), so cardId is recoverable via split_part() below.
 
 CREATE TABLE price_window (
     market_key   VARCHAR(160) NOT NULL,

@@ -42,23 +42,8 @@ import org.apache.kafka.streams.state.Stores;
 import org.apache.kafka.streams.state.WindowStore;
 
 /**
- * The core Kafka Streams topology. Consumes the ingested {@code listings}/{@code sales} streams,
- * enriches against a {@code card-metadata} GlobalKTable, and derives live market intelligence:
- *
- * <ul>
- *   <li><b>Windowed aggregates</b> — hourly + daily tumbling (avg price + volume) and a 24h hopping
- *       window (advancing 1h) for moving average + volatility, each suppressed to one settled emit per
- *       window, published to {@code agg-price-windowed}.</li>
- *   <li><b>Arbitrage</b> — a KStream({@code listings})–KTable(rolling average) join flags listings
- *       priced below {@code (1 − margin) × avg} (gated by {@code minSamples}) to {@code arbitrage}.</li>
- *   <li><b>Spike</b> — a {@link SpikeDetector} processor emits when a sale deviates &gt;{@code σ} from
- *       its ticker's running mean (gated by {@code minSamples}).</li>
- *   <li><b>Alerts</b> — spike + arbitrage alerts are merged, metadata-enriched, branched by severity,
- *       and written to {@code alerts}.</li>
- * </ul>
- *
- * <p>Built as a plain class (not Spring-wired) so it can be exercised directly with
- * {@code TopologyTestDriver}; {@link KafkaStreamsTopologyConfig} injects the shared {@code StreamsBuilder}.
+ * The core Kafka Streams topology: windowed aggregates, arbitrage, and spike detection, merged into
+ * enriched, severity-branched {@code alerts}. A plain class, directly drivable with {@code TopologyTestDriver}.
  */
 public class MarketTopology {
 
@@ -69,7 +54,7 @@ public class MarketTopology {
     public static final String ARBITRAGE_TOPIC = "arbitrage";
     public static final String ALERTS_TOPIC = "alerts";
 
-    /** Rolling per-ticker reference stats (KTable store) — also the Phase 5 Interactive Query source. */
+    /** Rolling per-ticker reference stats (KTable store) — also the Interactive Query source. */
     public static final String ARB_REFERENCE_STORE = "arb-ref-stats";
 
     private final ObjectMapper objectMapper;

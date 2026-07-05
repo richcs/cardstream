@@ -6,10 +6,8 @@ import org.springframework.boot.context.properties.ConfigurationPropertiesScan;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
- * Cardstream backend: ingestion poller, Kafka Streams topology, serving (REST + WS/SSE),
- * and the Postgres sink consumer. Phase 1 adds the metadata catalog (Pokémon TCG API → Postgres
- * + compacted card-metadata topic) and the /api/cards endpoints; Phase 3 adds the multi-source
- * ingestion poller (marketplace feeds → Kafka).
+ * Cardstream backend: the metadata catalog, multi-source ingestion poller, Kafka Streams topology,
+ * serving (REST + WS/SSE), and the Postgres sink consumer, all in one Spring Boot process.
  */
 @SpringBootApplication
 @ConfigurationPropertiesScan

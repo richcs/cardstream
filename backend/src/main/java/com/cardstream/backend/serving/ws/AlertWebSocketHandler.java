@@ -17,9 +17,8 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import org.springframework.web.util.UriComponentsBuilder;
 
 /**
- * Live {@code /ws/alerts} feed. A connection with {@code ?userId=} query param only receives alerts for
- * cards on that user's watchlist; without it, every alert is pushed (matches project-scope's anonymous
- * "no login" model — watchlist scoping is opt-in per connection).
+ * Live {@code /ws/alerts} feed. A connection with {@code ?userId=} only receives alerts for cards on
+ * that user's watchlist; without it, every alert is pushed.
  */
 @Component
 public class AlertWebSocketHandler extends TextWebSocketHandler {

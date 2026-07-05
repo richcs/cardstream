@@ -1,4 +1,4 @@
--- Phase 1 catalog: Pokémon TCG sets and cards.
+-- Catalog: Pokémon TCG sets and cards.
 -- Populated by the metadata loader from the Pokémon TCG API (sets since market.catalog.since-release-date).
 
 CREATE TABLE card_set (
