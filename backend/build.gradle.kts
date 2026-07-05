@@ -11,6 +11,9 @@ dependencies {
     implementation("org.springframework.kafka:spring-kafka")
     // /ws/alerts live feed.
     implementation("org.springframework.boot:spring-boot-starter-websocket")
+    // Swagger UI + OpenAPI docs over the REST surface.
+    // 2.6.x is the springdoc line compatible with Spring Boot 3.3.x (2.7+/2.8+ need Boot 3.4+).
+    implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.6.0")
 
     // Kafka Streams topology (version managed by the Spring Boot BOM).
     implementation("org.apache.kafka:kafka-streams")

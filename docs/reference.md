@@ -74,6 +74,8 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 | DELETE | `/api/watchlist/{cardId}` (`X-User-Id`) | Remove from watchlist |
 | WS | `/ws/alerts` | Live alert feed (filtered by watchlist when `?userId=` is set) |
 | SSE | `/sse/prices` | Live price/aggregate updates |
+| GET | `/swagger-ui.html` | Swagger UI over this surface (springdoc-openapi) |
+| GET | `/v3/api-docs` | Generated OpenAPI 3 spec (JSON) |
 
 The `frontend/` dashboard (`api/client.ts`/`api/types.ts`) is a typed client over exactly this surface — keep them in sync when this table changes.
 
