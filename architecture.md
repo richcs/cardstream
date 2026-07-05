@@ -274,10 +274,35 @@ live under `market.thresholds.*` (`ThresholdProperties`); see Appendix C of the 
 
 ---
 
-## 8. Status & roadmap
+## 8. Serving & sink (Phase 5)
 
-Phases 1–3 (catalog, simulator, ingestion) are complete and verified end-to-end. Phase 4 (this
-topology) is code-complete and TopologyTestDriver-verified; live end-to-end verification against
-running infra is the next step. Phase 5 layers serving (Interactive Queries, the Postgres sink, history
-and feed endpoints, WS/SSE); Phase 6 is the thin UI. See [`implementation-plan.md`](implementation-plan.md)
-for the phase-by-phase "done when" bars.
+`com.cardstream.backend.serving` (REST, Interactive Queries, WS/SSE, watchlist) and
+`com.cardstream.backend.sink` (the Postgres sink consumer) sit downstream of the topology:
+
+- **Interactive Queries** — `MarketQueryService` wraps Spring Kafka's `KafkaStreamsInteractiveQueryService`
+  (a bean built from the auto-declared `defaultKafkaStreamsBuilder`) and reads the arbitrage join's
+  `arb-ref-stats` KTable store directly. That store already holds a running per-ticker mean/stddev/last
+  price, so it doubles as the "current state" read for `GET /api/market/{marketKey}` and
+  `GET /api/cards/{cardId}` — live, not bounded by a settled window. A single-instance MVP deployment
+  means every query is local (no remote-host routing).
+- **Sink consumer** — `MarketSinkConsumer` is a plain `@KafkaListener` pair (not Kafka Connect), one per
+  topic (`agg-price-windowed`, `alerts`), each on its **own** consumer-group id — sharing one group id
+  across topics with different subscriptions is a known Kafka rebalance pitfall. Values are parsed
+  manually with the app `ObjectMapper` (String-valued consumer factory; no type headers on the wire, so
+  no per-type `JsonDeserializer` config is needed). Upserts into `price_window`/`alert` are `ON CONFLICT`
+  idempotent, so consumer restarts or redelivery never duplicate rows.
+- **History & derived reads** — `PriceWindowRepository`/`AlertRepository` (sink-owned, since they read
+  what the sink writes) back `/api/cards/{cardId}/history`, `/api/top-movers` (a `LAG()` window-function
+  query), `/api/alerts`, and `/api/arbitrage`. Only the unified `alerts` topic is sunk — `/api/arbitrage`
+  is just `type = 'ARBITRAGE'` over the same `alert` table (see Appendix D of the implementation plan).
+  `cardId` is recovered from `marketKey` via Postgres `split_part` rather than a redundant column.
+- **Live push** — `/ws/alerts` (`AlertWebSocketHandler`) and `/sse/prices` (`PriceSseController`) are fed
+  directly from the same sink-consumer callbacks that write to Postgres, so one Kafka read powers both
+  persistence and the live feed. A WS connection opened with `?userId=` is scoped to that user's
+  watchlist (`WatchlistRepository.isWatching`); without it, every alert is pushed.
+
+## 9. Status & roadmap
+
+Phases 1–5 (catalog, simulator, ingestion, streams topology, serving/sink) are complete and verified
+end-to-end against live infra. Phase 6 is the thin UI. See
+[`implementation-plan.md`](implementation-plan.md) for the phase-by-phase "done when" bars.

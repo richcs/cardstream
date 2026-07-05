@@ -69,7 +69,8 @@ public class MarketTopology {
     public static final String ARBITRAGE_TOPIC = "arbitrage";
     public static final String ALERTS_TOPIC = "alerts";
 
-    static final String ARB_REFERENCE_STORE = "arb-ref-stats";
+    /** Rolling per-ticker reference stats (KTable store) — also the Phase 5 Interactive Query source. */
+    public static final String ARB_REFERENCE_STORE = "arb-ref-stats";
 
     private final ObjectMapper objectMapper;
     private final ThresholdProperties thresholds;

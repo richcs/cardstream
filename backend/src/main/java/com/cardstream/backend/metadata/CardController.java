@@ -1,6 +1,8 @@
 package com.cardstream.backend.metadata;
 
 import com.cardstream.backend.metadata.CardRepository.Page;
+import com.cardstream.backend.serving.CardDetailResponse;
+import com.cardstream.backend.serving.MarketQueryService;
 import com.cardstream.common.model.Game;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,15 +13,17 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 
-/** Catalog search and detail. Current market state is layered on in Phase 5. */
+/** Catalog search and detail; detail is layered with current market state via Interactive Queries. */
 @RestController
 @RequestMapping("/api/cards")
 public class CardController {
 
     private final CardRepository cards;
+    private final MarketQueryService marketQuery;
 
-    public CardController(CardRepository cards) {
+    public CardController(CardRepository cards, MarketQueryService marketQuery) {
         this.cards = cards;
+        this.marketQuery = marketQuery;
     }
 
     @GetMapping
@@ -34,9 +38,9 @@ public class CardController {
     }
 
     @GetMapping("/{cardId}")
-    public ResponseEntity<CardView> detail(@PathVariable String cardId) {
+    public ResponseEntity<CardDetailResponse> detail(@PathVariable String cardId) {
         return cards.findById(cardId)
-                .map(ResponseEntity::ok)
+                .map(card -> ResponseEntity.ok(new CardDetailResponse(card, marketQuery.snapshotsForCard(cardId))))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Unknown card: " + cardId));
     }
 }

@@ -18,6 +18,12 @@ spring:
       properties:
         enable.idempotence: true
       acks: all
+    consumer:
+      # Phase 5 sink consumer (MarketSinkConsumer): values parsed manually with the app ObjectMapper
+      # (no type headers on the wire), so String suffices for both key and value here.
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
     streams:
       # Phase 4 topology. application-id namespaces the consumer group + internal topics/state stores.
       # Serdes, timestamp extractor, and other settings are set in KafkaStreamsTopologyConfig.

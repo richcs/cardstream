@@ -8,6 +8,9 @@ spring:
   flyway:
     enabled: false
   kafka:
+    listener:
+      # The Phase 5 sink @KafkaListeners are wired (verifying config) but not started — no broker here.
+      auto-startup: false
     streams:
       # The topology is built (verifying wiring) but not started — no broker in the smoke test.
       auto-startup: false

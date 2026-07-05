@@ -9,6 +9,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     implementation("org.springframework.kafka:spring-kafka")
+    // Phase 5: /ws/alerts live feed.
+    implementation("org.springframework.boot:spring-boot-starter-websocket")
 
     // Phase 4: Kafka Streams topology (version managed by the Spring Boot BOM).
     implementation("org.apache.kafka:kafka-streams")
@@ -25,4 +27,8 @@ dependencies {
     testImplementation("org.apache.kafka:kafka-streams-test-utils")
     // Context-load smoke test runs offline against in-memory H2 (Flyway disabled in tests).
     testRuntimeOnly("com.h2database:h2")
+    // Phase 5: sink/serving repository tests run Flyway migrations against a real Postgres.
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
 }

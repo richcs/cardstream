@@ -14,6 +14,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafkaStreams;
 import org.springframework.kafka.annotation.KafkaStreamsDefaultConfiguration;
 import org.springframework.kafka.config.KafkaStreamsConfiguration;
+import org.springframework.kafka.config.StreamsBuilderFactoryBean;
+import org.springframework.kafka.streams.KafkaStreamsInteractiveQueryService;
 
 /**
  * Kafka Streams wiring (spring-kafka): {@link EnableKafkaStreams} plus the required
@@ -52,5 +54,12 @@ public class KafkaStreamsTopologyConfig {
         MarketTopology topology = new MarketTopology(objectMapper, thresholds, metrics);
         topology.build(builder);
         return topology;
+    }
+
+    /** Phase 5: hot reads off the topology's state stores (see {@code MarketQueryService}). */
+    @Bean
+    KafkaStreamsInteractiveQueryService kafkaStreamsInteractiveQueryService(
+            StreamsBuilderFactoryBean streamsBuilderFactoryBean) {
+        return new KafkaStreamsInteractiveQueryService(streamsBuilderFactoryBean);
     }
 }

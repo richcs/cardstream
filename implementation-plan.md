@@ -118,12 +118,43 @@ Implemented in `backend` package `com.cardstream.backend.streams`: a plain, test
 - **Spring integration** (context7-verified for spring-kafka 3.2.x): `@EnableKafkaStreams` + a `KafkaStreamsConfiguration` bean (name = `KafkaStreamsDefaultConfiguration.DEFAULT_STREAMS_CONFIG_BEAN_NAME`); define the topology in `@Bean` methods taking an injected `StreamsBuilder` (lifecycle managed by `StreamsBuilderFactoryBean`). Set `DEFAULT_TIMESTAMP_EXTRACTOR_CLASS_CONFIG` to a **custom event-time `TimestampExtractor`** that reads `soldAt`/`listedAt` (do *not* use `WallclockTimestampExtractor`).
 - **Done when:** TopologyTestDriver tests pass for each operator; injected spike/arbitrage from Phase 2 produce correct alerts end-to-end. ✅ Both bars met. TopologyTestDriver: per-operator tests green (spike fires past `minSamples`/σ and is suppressed below them; arbitrage flags a below-margin listing and respects the margin; hourly windowed aggregate emits exactly one settled result on window close; GlobalKTable enrichment attaches the card name). Live end-to-end (against real Kafka/Postgres + the simulator): injected spike (Ho-Oh, σ≈28 vs a 230-sample baseline → HIGH) and arbitrage (Mega Pyroar ex, listing 2.84 vs ref-avg 4.23 → 33% discount, MED) produced correctly-enriched records on `alerts` **and** `arbitrage`; the hourly `agg-price-windowed` window emitted exactly one settled aggregate per key (4680 keys, avg/volatility/volume/sampleCount; e.g. me4-15 avg 4.23 matched its arbitrage ref-avg). Note: the single stream thread caps throughput — at very high ingestion rates the streams consumer lags unboundedly and event-time stalls (windows never close); verify at modest rates. To exercise window emission without waiting for the wall-clock hour boundary, produce sales timestamped at the window end directly to `sales` (advances event-time, triggers `Suppressed` flush).
 
-### Phase 5 — Serving & query
-- Interactive Queries via Spring Kafka's **`KafkaStreamsInteractiveQueryService`** (3.2+ facade — don't hand-roll store/host lookup): `GET /api/market/{marketKey}`, `GET /api/cards/{cardId}` current state across finishes/conditions.
-- `sink` consumer → Postgres windowed-aggregate + alert tables (Flyway migrations).
-- History/derived endpoints: `/api/cards/{cardId}/history`, `/api/top-movers`, `/api/arbitrage`, `/api/alerts` (Appendix B).
-- WS/SSE feeds: `/ws/alerts`, `/sse/prices`; watchlist CRUD (`/api/watchlist`, `X-User-Id` header); serving-layer filter of alert feed by a user's watchlist.
+### Phase 5 — Serving & query ✅
+Implemented in `backend` packages `com.cardstream.backend.serving` (REST, IQ, WS/SSE, watchlist) and
+`com.cardstream.backend.sink` (the Postgres sink consumer + its repositories).
+
+- Interactive Queries via Spring Kafka's **`KafkaStreamsInteractiveQueryService`** (a bean in
+  `KafkaStreamsTopologyConfig`, wrapping the `defaultKafkaStreamsBuilder`): `MarketQueryService` reads
+  the topology's `arb-ref-stats` KTable store directly, so "current state" is a live, unbounded running
+  mean/stddev/last-price per ticker (not a settled window). `GET /api/market/{marketKey}` and
+  `GET /api/cards/{cardId}` (layered with a `markets` array enumerating all finish/condition combos)
+  both read off it; a not-yet-ready state store maps to `503`, an unknown ticker to `404`, a malformed
+  key to `400`.
+- `sink` consumer (`MarketSinkConsumer`, two `@KafkaListener`s on **distinct consumer-group ids** —
+  sharing one group id across topics with different subscriptions is a Kafka pitfall) parses
+  `agg-price-windowed`/`alerts` JSON manually with the app `ObjectMapper` (no type headers, consistent
+  with the rest of the wire format) and upserts into `price_window`/`alert` (Flyway `V2__serving.sql`;
+  idempotent — `ON CONFLICT` — so consumer restarts/redelivery never duplicate). `cardId` is recovered
+  from `marketKey` via Postgres `split_part` rather than a redundant column.
+- History/derived endpoints (`PriceWindowRepository`/`AlertRepository`, both sink-owned since they read
+  what the sink writes): `/api/cards/{cardId}/history` (hourly/daily, cardId-prefix scan), `/api/top-movers`
+  (a `LAG()`-windowed-function query ranking % change of latest vs. previous settled window),
+  `/api/arbitrage` and `/api/alerts` (the same `alert` table; arbitrage is just `type=ARBITRAGE`, since
+  Postgres only sinks the unified `alerts` topic — not the raw `arbitrage` topic — per Appendix D).
+- WS/SSE feeds: `/ws/alerts` (`AlertWebSocketHandler`, watchlist-scoped when the client connects with
+  `?userId=`) and `/sse/prices` (`PriceSseController`), both fed directly from the same sink-consumer
+  callbacks that write to Postgres — one Kafka read powers persistence and the live push. Watchlist CRUD
+  (`WatchlistRepository`/`WatchlistController`, `X-User-Id` header, `POST` 404s on an unknown `cardId`).
 - **Done when:** all endpoints return correct data; alert feed pushes live; watchlist scoping works.
+  ✅ Verified end-to-end against live infra: `GET /api/cards/{cardId}` and `/api/market/{marketKey}`
+  returned live IQ snapshots; a future-timestamped `sales` record (the Phase 4 technique — advances
+  event-time to force window close) produced settled windows that landed in `price_window` **and**
+  streamed out over `/sse/prices` in real time; synthetic spike/organic arbitrage alerts landed in
+  `alert` and streamed over `/ws/alerts` to a real WebSocket client; a second client connected with
+  `?userId=` on an empty watchlist received **no** push for the same alert (confirmed present via
+  `/api/alerts`), proving watchlist scoping; `/api/top-movers` (gainers/losers) and `/api/cards/{cardId}/history`
+  read back seeded windows correctly; watchlist `GET/POST/DELETE` round-tripped (404 on unknown card).
+  A `ServingRepositoriesIT` (Testcontainers Postgres) covers the same repository behavior for CI/other
+  machines; it couldn't run in this sandbox (local Docker Desktop API access blocker unrelated to the code).
 
 ### Phase 6 — Thin UI
 - React + TS + Vite: card list/search, card detail with live price chart + history, top movers, arbitrage feed, alert feed with severity filter, watchlist toggle.
@@ -200,7 +231,8 @@ Key (all market topics): `marketKey = "{cardId}|{finish}|{condition}"`.
 | GET | `/api/top-movers?window=daily&dir=gainers\|losers&limit=` | Biggest movers |
 | GET | `/api/arbitrage?limit=` | Recent arbitrage flags |
 | GET | `/api/alerts?severity=&type=&limit=` | Recent alerts |
-| GET/POST/DELETE | `/api/watchlist` (`X-User-Id`) | Manage watchlist |
+| GET/POST | `/api/watchlist` (`X-User-Id`) | List / add (`{cardId}` body) |
+| DELETE | `/api/watchlist/{cardId}` (`X-User-Id`) | Remove from watchlist |
 | WS | `/ws/alerts` | Live alert feed (filtered by watchlist when `userId` set) |
 | SSE | `/sse/prices` | Live price/aggregate updates |
 
