@@ -156,14 +156,26 @@ Implemented in `backend` packages `com.cardstream.backend.serving` (REST, IQ, WS
   A `ServingRepositoriesIT` (Testcontainers Postgres) covers the same repository behavior for CI/other
   machines; it couldn't run in this sandbox (local Docker Desktop API access blocker unrelated to the code).
 
-### Phase 6 — Thin UI
-- React + TS + Vite: card list/search, card detail with live price chart + history, top movers, arbitrage feed, alert feed with severity filter, watchlist toggle.
-- Live updates via WebSocket/SSE; minimal styling.
-- **Done when:** dashboard demos the streams live against the simulator.
+### Phase 6 — Thin UI ✅
+React + TS + Vite app in `frontend/`: `api/client.ts` + `api/types.ts` (typed fetch wrappers
+matching Appendix B exactly), `hooks/useAlertsFeed.ts` (`/ws/alerts`, reconnecting, optionally
+watchlist-scoped) and `hooks/usePriceStream.ts` (`/sse/prices`), `hooks/useUserId.ts` (anon
+`crypto.randomUUID` in localStorage). Pages: card list/search (`CardListPage`, paged grid),
+card detail (`CardDetailPage` — per-ticker market table, `PriceChart` via Recharts fed by
+`/history` and live SSE updates, watchlist star), top movers, arbitrage feed, and an alert
+feed with severity/type filters + a watchlist-only toggle (`AlertsPage`). The Vite dev server
+proxies `/api`, `/ws`, `/sse` to the backend (`vite.config.ts`) so the browser only ever talks
+to one origin — no backend CORS config needed.
+- **Done when:** dashboard demos the streams live against the simulator. ✅ Verified end-to-end
+  against live infra (Vite dev server on 5173 proxying to the backend on 8080): `/api/cards`
+  search and card detail loaded real catalog + IQ market data through the proxy; `/sse/prices`
+  streamed settled windowed aggregates live; `/ws/alerts` delivered a correctly GlobalKTable-
+  enriched (`name` populated) synthetic spike alert and real arbitrage flags matching the
+  `Alert` shape the UI renders; watchlist add/list/remove round-tripped through the proxy with
+  the `X-User-Id` header. `npm run build` and `npm run lint` (oxlint) both pass clean.
 
-### Phase 7 — Testing, observability, docs
+### Phase 7 — Testing & docs
 - Unit (TopologyTestDriver), integration (Testcontainers: Kafka + Postgres), a thin e2e (inject anomaly → assert alert + UI/API).
-- Micrometer metrics, Streams state/lag dashboards (optional Prometheus/Grafana).
 - README + run instructions; revisit JSON→Avro upgrade.
 - **Done when:** green test suite; `docker compose up` yields a working demo from a clean checkout.
 
