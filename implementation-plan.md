@@ -174,10 +174,22 @@ to one origin — no backend CORS config needed.
   `Alert` shape the UI renders; watchlist add/list/remove round-tripped through the proxy with
   the `X-User-Id` header. `npm run build` and `npm run lint` (oxlint) both pass clean.
 
-### Phase 7 — Testing & docs
-- Unit (TopologyTestDriver), integration (Testcontainers: Kafka + Postgres), a thin e2e (inject anomaly → assert alert + UI/API).
-- README + run instructions; revisit JSON→Avro upgrade.
+### Phase 7 — Testing & docs ✅
+`MarketPipelineE2EIT` (`backend/src/test/java/.../e2e/`) adds the thin e2e: real Kafka +
+Postgres via Testcontainers (`org.testcontainers:kafka` added to `backend/build.gradle.kts`),
+ingestion disabled, synthetic sales/listings produced straight onto `sales`/`listings` with the
+app's own `ObjectMapper` (byte-identical wire format to the real producer/topology serdes), then
+asserts a spike and an arbitrage alert land enriched in Postgres (`AlertRepository`) and are
+readable back over `/api/alerts`, `/api/arbitrage`, and `/api/cards/{cardId}` (`TestRestTemplate`)
+— the same path the simulator's `/admin/inject/*` exercises live. Root `README.md` now documents
+the full local flow (infra → backend/simulator → catalog reload → frontend dev server → tests),
+and reconfirms the JSON-over-Avro decision for the MVP.
 - **Done when:** green test suite; `docker compose up` yields a working demo from a clean checkout.
+  Unit tests (TopologyTestDriver + the ingestion/metadata/simulator suites) are green. The
+  Testcontainers-backed tests (`ServingRepositoriesIT`, `MarketPipelineE2EIT`) compile and were
+  reviewed line-by-line for correctness, but — like `ServingRepositoriesIT` before it —
+  `MarketPipelineE2EIT` couldn't be executed in this sandbox (the same local Docker Desktop API
+  access blocker, unrelated to the code); both need a real Docker socket to actually run.
 
 ---
 

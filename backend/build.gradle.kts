@@ -31,4 +31,6 @@ dependencies {
     testImplementation("org.springframework.boot:spring-boot-testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    // Full-pipeline e2e test: a real broker so ingestion -> topology -> sink -> API runs end to end.
+    testImplementation("org.testcontainers:kafka")
 }

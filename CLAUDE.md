@@ -92,8 +92,18 @@ to the backend (`vite.config.ts`) — one origin in the browser, no CORS config 
 Verified end-to-end against live infra: catalog search/detail, live IQ market snapshots, live
 `/sse/prices` aggregates, a GlobalKTable-enriched spike alert and real arbitrage flags delivered
 over `/ws/alerts` matching the UI's `Alert` shape, and a full watchlist add/list/remove round trip
-— all through the dev-server proxy. `npm run build`/`npm run lint` pass clean. **Next:** **Phase 7**
-— testing & docs. Follow the phase order and "done when" bars in `implementation-plan.md`.
+— all through the dev-server proxy. `npm run build`/`npm run lint` pass clean.
+
+Phase 7 (testing & docs) complete. `MarketPipelineE2EIT` (`backend/src/test/java/.../e2e/`) is
+the thin e2e: real Kafka + Postgres via Testcontainers, ingestion disabled, synthetic sales/
+listings produced straight onto the topics with the app's own `ObjectMapper`, asserting a spike
+and an arbitrage alert land enriched in Postgres and read back correctly over `/api/alerts`,
+`/api/arbitrage`, and `/api/cards/{cardId}`. Root `README.md` documents the full local flow and
+reconfirms JSON-over-Avro for the MVP. Unit tests are green; the Testcontainers-backed tests
+(`ServingRepositoriesIT`, `MarketPipelineE2EIT`) compile and were reviewed for correctness but
+can't run in this sandbox (same pre-existing local Docker Desktop API access blocker) — both need
+a real Docker socket. This closes out the `implementation-plan.md` build plan; treat further work
+as maintenance/enhancement rather than a new phase.
 
 ## Workflow
 
