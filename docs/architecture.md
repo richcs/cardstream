@@ -2,8 +2,8 @@
 
 How Cardstream is put together and **how the Kafka Streams topology works**. Read alongside
 [`project-scope.md`](project-scope.md) (what), [`tech-stack.md`](tech-stack.md) (choices), and
-[`implementation-plan.md`](implementation-plan.md) (phased build + event schemas). This doc is the
-"how the pieces fit and why" layer; the implementation plan's appendices remain the source of truth
+[`implementation-plan.md`](implementation-plan.md) (build history). This doc is the
+"how the pieces fit and why" layer; [`reference.md`](reference.md) remains the source of truth
 for exact schemas, endpoints, and thresholds.
 
 ---
@@ -49,7 +49,7 @@ one ticker across every feed.
 | `common` | (library) | Event records, enums, `MarketKey`, topic-schema records. **No framework deps** — plain Java + Jackson. |
 | `backend` | one Spring Boot app | Ingestion poller → Kafka, the Streams topology, serving (REST + WS/SSE), and the Postgres sink consumer — co-located in a single process (normal at this scale). |
 | `simulator` | standalone Spring Boot app | A TCGplayer-shaped REST feed with a random-walk price engine + anomaly injection. Separate process to keep the external-feed boundary honest. |
-| `frontend` | Vite dev/static | Thin React/TS dashboard (Phase 6). |
+| `frontend` | Vite dev/static | Thin React/TS dashboard: card list/search, card detail with a live price chart, top movers, arbitrage feed, and a watchlist-aware alert feed. |
 
 The `backend` runs ingestion + streams + serving + sink in **one JVM**. That's deliberate: it's the
 simplest thing that works for ~100–500 events/sec, and the boundaries are drawn so ingestion can be
@@ -69,7 +69,7 @@ split into its own deployable later (the only rule being *one owner per source*)
    producing to `listings`/`sales`, keyed by `MarketKey` and tagged with `source`.
 4. **Stream processing** (`streams/`) — the topology consumes `listings`/`sales`, enriches against the
    `card-metadata` GlobalKTable, and emits to `agg-price-windowed`, `arbitrage`, and `alerts`.
-5. **Serving + sink** (Phase 5) — Interactive Queries answer hot reads from the state stores; a
+5. **Serving + sink** — Interactive Queries answer hot reads from the state stores; a
    dedicated consumer sinks aggregates/alerts to Postgres for history; WS/SSE push live feeds.
 
 ---
@@ -78,7 +78,7 @@ split into its own deployable later (the only rule being *one owner per source*)
 
 | Topic | Key | Produced by | Notes |
 |---|---|---|---|
-| `listings` | `marketKey` | ingestion | Canonical listing events (Appendix A). 6 partitions. |
+| `listings` | `marketKey` | ingestion | Canonical listing events (see `reference.md`). 6 partitions. |
 | `sales` | `marketKey` | ingestion | Canonical sale events. 6 partitions. |
 | `price-updates` | `marketKey` | ingestion | Reserved; not yet consumed by the topology. |
 | `card-metadata` | `cardId` | metadata loader | **Compacted**; loaded as a GlobalKTable. |
@@ -233,15 +233,15 @@ incrementing a per-severity meter before writing to `alerts`. Branching is wired
 | `spike-stats` | key-value (RocksDB) | per-ticker prior distribution for spike detection |
 
 All are durable RocksDB stores (changelog-backed in a real cluster) and become queryable via
-Interactive Queries in Phase 5. Caching is disabled (`STATESTORE_CACHE_MAX_BYTES = 0`) so windowed
-and joined results forward promptly and deterministically.
+Interactive Queries at the serving layer. Caching is disabled (`STATESTORE_CACHE_MAX_BYTES = 0`) so
+windowed and joined results forward promptly and deterministically.
 
 ### 5.8 Configuration knobs
 
 `KafkaStreamsTopologyConfig` sets: `application-id` (namespaces the consumer group + internal
 topics/state), the event-time extractor, zero record cache, a 1s commit interval, and
 `LogAndContinueExceptionHandler` so a single poison record can't halt the topology. Market thresholds
-live under `market.thresholds.*` (`ThresholdProperties`); see Appendix C of the implementation plan.
+live under `market.thresholds.*` (`ThresholdProperties`); see `reference.md`'s Metric thresholds section.
 
 ---
 
@@ -274,7 +274,7 @@ live under `market.thresholds.*` (`ThresholdProperties`); see Appendix C of the 
 
 ---
 
-## 8. Serving & sink (Phase 5)
+## 8. Serving & sink
 
 `com.cardstream.backend.serving` (REST, Interactive Queries, WS/SSE, watchlist) and
 `com.cardstream.backend.sink` (the Postgres sink consumer) sit downstream of the topology:
@@ -294,7 +294,7 @@ live under `market.thresholds.*` (`ThresholdProperties`); see Appendix C of the 
 - **History & derived reads** — `PriceWindowRepository`/`AlertRepository` (sink-owned, since they read
   what the sink writes) back `/api/cards/{cardId}/history`, `/api/top-movers` (a `LAG()` window-function
   query), `/api/alerts`, and `/api/arbitrage`. Only the unified `alerts` topic is sunk — `/api/arbitrage`
-  is just `type = 'ARBITRAGE'` over the same `alert` table (see Appendix D of the implementation plan).
+  is just `type = 'ARBITRAGE'` over the same `alert` table (see `reference.md`'s Postgres schema section).
   `cardId` is recovered from `marketKey` via Postgres `split_part` rather than a redundant column.
 - **Live push** — `/ws/alerts` (`AlertWebSocketHandler`) and `/sse/prices` (`PriceSseController`) are fed
   directly from the same sink-consumer callbacks that write to Postgres, so one Kafka read powers both
@@ -303,6 +303,7 @@ live under `market.thresholds.*` (`ThresholdProperties`); see Appendix C of the 
 
 ## 9. Status & roadmap
 
-Phases 1–5 (catalog, simulator, ingestion, streams topology, serving/sink) are complete and verified
-end-to-end against live infra. Phase 6 is the thin UI. See
-[`implementation-plan.md`](implementation-plan.md) for the phase-by-phase "done when" bars.
+The system — catalog, simulator, ingestion, streams topology, serving/sink, and the frontend
+dashboard — is complete and verified end-to-end against live infra. See
+[`implementation-plan.md`](implementation-plan.md) for the build history and
+[`reference.md`](reference.md) for the current schemas, API surface, and thresholds.

@@ -1,7 +1,7 @@
 # Frontend (thin UI)
 
 React + TypeScript + Vite dashboard over the backend's REST + WebSocket/SSE contracts
-(see [`../implementation-plan.md`](../implementation-plan.md) Appendix B).
+(see [`../docs/reference.md`](../docs/reference.md)'s API surface section).
 
 ## Run
 

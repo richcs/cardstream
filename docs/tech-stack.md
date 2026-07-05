@@ -71,7 +71,7 @@ Derived from `project-scope.md`. Choices favor a backend- and Kafka-Streams-firs
 ## Frontend (thin)
 
 - **React + TypeScript** with **Vite** — fast dev server, minimal config; matches the existing TS toolchain.
-- **Charts**: a lightweight library (e.g. Recharts or uPlot) for live price charts and top movers.
+- **Charts**: **Recharts** for live price charts and top movers.
 - **Live updates**: native `WebSocket` / `EventSource` (SSE) — no heavy state-management library in MVP.
 - Scope is intentionally minimal: price chart, top movers, arbitrage feed, alert feed. Polish is post-MVP.
 
@@ -84,7 +84,7 @@ Derived from `project-scope.md`. Choices favor a backend- and Kafka-Streams-firs
 ## Infrastructure & dev tooling
 
 - **Repo layout** — monorepo: a Gradle multi-module backend (`common`, `backend`) plus a **standalone `simulator`** service and a `/frontend` folder. The simulator runs as its own container, standing in for the external TCGplayer feed.
-- **Docker Compose** — single-broker Kafka/Redpanda, Postgres, backend, simulator, thin frontend; optional Schema Registry + Kafka Connect when adopting Avro.
+- **Docker Compose** — single-broker Kafka (KRaft), Postgres, backend, simulator (behind an `apps` profile); the frontend runs via its own Vite dev server (`npm run dev`), not yet containerized. Optional Schema Registry + Kafka Connect when adopting Avro.
 - **Gradle** — backend build (Kotlin DSL).
 - **JUnit 5 + `kafka-streams-test-utils` (`TopologyTestDriver`)** — unit-test the topology without a live broker.
 - **Testcontainers** — integration tests against ephemeral Kafka + Postgres.
@@ -100,4 +100,6 @@ Derived from `project-scope.md`. Choices favor a backend- and Kafka-Streams-firs
 
 ---
 
-_Open decisions to confirm during build: JSON vs. Avro timing, Kafka vs. Redpanda for local dev, chart library (Recharts vs. uPlot)._
+_Decisions resolved during the build: JSON for the MVP wire format (Avro + Schema Registry stays the
+documented upgrade path, not yet needed); Kafka in KRaft mode for local dev (Redpanda remains an
+acceptable drop-in if ever revisited); Recharts for the frontend's charts._

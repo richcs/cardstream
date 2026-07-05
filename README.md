@@ -3,10 +3,11 @@
 Event-driven platform that ingests marketplace listings/sales and derives live market
 intelligence (prices, moving averages, volatility, arbitrage, spike alerts) with Kafka Streams.
 
-- **What** → [`project-scope.md`](project-scope.md)
-- **How (stack)** → [`tech-stack.md`](tech-stack.md)
-- **How (architecture + streams topology)** → [`architecture.md`](architecture.md)
-- **Build plan** → [`implementation-plan.md`](implementation-plan.md)
+- **What** → [`docs/project-scope.md`](docs/project-scope.md)
+- **How (stack)** → [`docs/tech-stack.md`](docs/tech-stack.md)
+- **How (architecture + streams topology)** → [`docs/architecture.md`](docs/architecture.md)
+- **Build history** → [`docs/implementation-plan.md`](docs/implementation-plan.md)
+- **Reference (event schemas, API surface, thresholds, Postgres schema, simulator contract)** → [`docs/reference.md`](docs/reference.md)
 
 ## Modules
 
@@ -88,5 +89,5 @@ other end enriched, sunk to Postgres, and queryable over `/api/alerts`, `/api/ar
 
 JSON (Jackson) end to end for the MVP — chosen for velocity over a schema registry setup. The
 documented upgrade path is Avro + Confluent Schema Registry once schema evolution across
-producers/consumers becomes a real concern (see `tech-stack.md`); revisited and reconfirmed as
+producers/consumers becomes a real concern (see `docs/tech-stack.md`); revisited and reconfirmed as
 out of scope for the MVP.
